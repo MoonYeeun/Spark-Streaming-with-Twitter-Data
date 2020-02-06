@@ -10,10 +10,10 @@ from requests_oauthlib import OAuth1Session
 from tweepy.streaming import StreamListener
 
 
-consumer_key = 'S9mscvjwxdzHmmiFZmbFDWW4O'
-consumer_secret = 'sExiybIvG9tfcvLeOKmre7t4qUMZqOyOJ0QycsMIYNHGGlwf2K'
-access_token_key = '1212621264461824001-0VT9WpXEnoENyoGIZLQhszhAMBt6ek'
-access_token_secret = 'DPnwrlpJ1ITJLLOXnM2UUpmH6An1T1MMr7Bv2BeKZEuiy'
+consumer_key = ''
+consumer_secret = ''
+access_token_key = ''
+access_token_secret = ''
 
 
 class listener(StreamListener):
@@ -25,12 +25,6 @@ class listener(StreamListener):
 
     def on_error(self, status_code):
         print(status_code)
-
-# if __name__ == '__main__':
-#     auth = OAuthHandler(consumer_key, consumer_secret)
-#     auth.set_access_token(access_token_key,access_token_secret)
-#     twitterStream = Stream(auth, listener())
-#     twitterStream.filter(track=["#BTS"])
 
 def get_tweets():
     url = 'https://stream.twitter.com/1.1/statuses/filter.json'
@@ -45,8 +39,6 @@ def get_tweets():
         try:
             tweet = json.loads(line)
             tweet_text = tweet['text']
-            # print('tweet ' + tweet_text)
-            # print("--------------------")
             client_socket.sendall(tweet_text.encode() + '\n'.encode('ascii'))
             data = client_socket.recv(1024)
             print(data.decode())

@@ -47,18 +47,6 @@ while True:
     # 받은 문자열을 다시 클라이언트로 전송해줍니다.(에코)
     client_socket.sendall(data)
 
-    # lines = ssc.socketTextStream("localhost", 9999)
-    # print(lines)
-    # words = lines.flatMap(lambda line: line.split(" "))
-    # # Count each word in each batch
-    # pairs = words.map(lambda word: (word, 1))
-    # wordCounts = pairs.reduceByKey(lambda x, y: x + y)
-    # # Print the first ten elements of each RDD generated in this DStream to the console
-    # wordCounts.pprint()
-    # ssc.start()  # Start the computation
-    # ssc.awaitTermination()  # Wait for the computation to terminate
-    #
-
 # 소켓을 닫습니다.
 client_socket.close()
 server_socket.close()

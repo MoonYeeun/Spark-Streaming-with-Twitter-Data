@@ -18,7 +18,7 @@ class TweetsListener(StreamListener):
   def on_data(self, data):
       try:
           print(data)
-          self.client_socket.send( data.encode('utf-8') )
+          self.client_socket.send( data.encode('utf-8') ) # 소켓에 들어온 클라이언트에게 전달
           return True
       except BaseException as e:
           print("Error on_data: %s" % str(e))
@@ -28,6 +28,7 @@ class TweetsListener(StreamListener):
       print(status)
       return True
 
+# twitter api 연결
 def sendData(c_socket):
   auth = OAuthHandler(consumer_key, consumer_secret)
   auth.set_access_token(access_token_key, access_token_secret)

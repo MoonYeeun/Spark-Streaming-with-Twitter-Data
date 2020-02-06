@@ -1,16 +1,15 @@
-import json
 from pyspark import SparkContext
 from pyspark.streaming import StreamingContext
 # import pyspark
 # spark = pyspark.sql.SparkSession.builder.appName("pysaprk_python").getOrCreate()
 from pyspark.sql import *
-from pyspark.sql.types import *
 from pyspark import StorageLevel
 
 sc = SparkContext('local[2]',"test")
 sqlContext = SQLContext(sc)
 IP = "127.0.0.1"
 Port = 5556
+# 소켓을 통해 받아온 raw tweet 중 프로젝트에 필요한 부분들만 추출하는 작업
 
 schema = [
     'created_at',
@@ -55,11 +54,12 @@ full_schema = [
     'quoted_status_permalink',
     'extended_tweet'
 ]
-# Convenience function for turning JSON strings into DataFrames.
+# get DStream RDD
 def getStreaming(data, schema=None):
   data.foreachRDD(process)
   return True
 
+# Convenience function for turning JSON strings into DataFrames.
 def process(rdd):
     try:
         jsonRDD = sqlContext.read.json(rdd).cache()

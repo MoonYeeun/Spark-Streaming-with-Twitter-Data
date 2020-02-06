@@ -4,12 +4,12 @@ from tweepy.streaming import StreamListener
 import socket
 import json
 
-consumer_key = 'S9mscvjwxdzHmmiFZmbFDWW4O'
-consumer_secret = 'sExiybIvG9tfcvLeOKmre7t4qUMZqOyOJ0QycsMIYNHGGlwf2K'
-access_token_key = '1212621264461824001-0VT9WpXEnoENyoGIZLQhszhAMBt6ek'
-access_token_secret = 'DPnwrlpJ1ITJLLOXnM2UUpmH6An1T1MMr7Bv2BeKZEuiy'
+consumer_key = ''
+consumer_secret = ''
+access_token_key = ''
+access_token_secret = ''
 
-
+# twitter api 로 부터 받아온 tweet 들 중 text 만 추출하여 보냄
 class TweetsListener(StreamListener):
 
   def __init__(self, csocket):
