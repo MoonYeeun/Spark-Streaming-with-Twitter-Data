@@ -18,7 +18,11 @@ class TweetsListener(StreamListener):
   def on_data(self, data):
       try:
           print(data)
-          self.client_socket.send( data.encode('utf-8') ) # 소켓에 들어온 클라이언트에게 전달
+          self.client_socket.send(data.encode('utf-8'))  # 소켓에 들어온 클라이언트에게 전달
+          tweet = json.loads(data)
+          # if tweet['quoted_status']:
+          #     print('quoted '+ data)
+
           return True
       except BaseException as e:
           print("Error on_data: %s" % str(e))
@@ -34,7 +38,7 @@ def sendData(c_socket):
   auth.set_access_token(access_token_key, access_token_secret)
 
   twitter_stream = Stream(auth, TweetsListener(c_socket)) # Create a Stream
-  twitter_stream.filter(track=['#BTS']) # Starting a Stream
+  twitter_stream.filter(track=['smilegate']) # Starting a Stream
 
 if __name__ == "__main__":
   s = socket.socket()         # Create a socket object
