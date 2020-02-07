@@ -4,10 +4,10 @@ from tweepy.streaming import StreamListener
 import socket
 import json
 
-consumer_key = 'S9mscvjwxdzHmmiFZmbFDWW4O'
-consumer_secret = 'sExiybIvG9tfcvLeOKmre7t4qUMZqOyOJ0QycsMIYNHGGlwf2K'
-access_token_key = '1212621264461824001-0VT9WpXEnoENyoGIZLQhszhAMBt6ek'
-access_token_secret = 'DPnwrlpJ1ITJLLOXnM2UUpmH6An1T1MMr7Bv2BeKZEuiy'
+consumer_key = ''
+consumer_secret = ''
+access_token_key = ''
+access_token_secret = ''
 
 
 class TweetsListener(StreamListener):
@@ -19,11 +19,8 @@ class TweetsListener(StreamListener):
       try:
           print(data)
           self.client_socket.send(data.encode('utf-8'))  # 소켓에 들어온 클라이언트에게 전달
-          tweet = json.loads(data)
-          # if tweet['quoted_status']:
-          #     print('quoted '+ data)
-
           return True
+
       except BaseException as e:
           print("Error on_data: %s" % str(e))
       return True
@@ -38,7 +35,7 @@ def sendData(c_socket):
   auth.set_access_token(access_token_key, access_token_secret)
 
   twitter_stream = Stream(auth, TweetsListener(c_socket)) # Create a Stream
-  twitter_stream.filter(track=['smilegate']) # Starting a Stream
+  twitter_stream.filter(track=['#bts']) # Starting a Stream
 
 if __name__ == "__main__":
   s = socket.socket()         # Create a socket object

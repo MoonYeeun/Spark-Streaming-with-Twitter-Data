@@ -19,16 +19,16 @@ full_schema = [
     'text',
     'entities.hashtags.text as hashtag',
     'extended_tweet.full_text as extended_fullText',
-    'extended_tweet.entites.hashtags.text as extended_hashtag',
+    'extended_tweet.entities.hashtags.text as extended_hashtag',
     'retweeted_status.id as originTweet_id', # 리트윗 된 경우 원글
     'retweeted_status.text as originTweet_text',
     'retweeted_status.extended_tweet.full_text as originTweet_fullText',
-    'retweeted_status.extended_tweet.entities.hashtags.text as originTweet_fullhashtag'
+    'retweeted_status.extended_tweet.entities.hashtags.text as originTweet_fullhashtag',
     'retweeted_status.quote_count as originTweet_quoteCount',
     'retweeted_status.retweet_count as originTweet_retweetCount',
     'retweeted_status.favorite_count as originTweet_favoriteCount',
-    'quoted_status',
-    'is_quote_status'
+    'is_quote_status',
+    'quoted_status'
 ]
 
 # get DStream RDD
