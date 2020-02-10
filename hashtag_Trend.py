@@ -76,15 +76,18 @@ def process(rdd):
 def word_count(list):
     print('word count 들어옴')
     pairs = list.map(lambda word: (word, 1))
-    # 상위 10개만 가져오기
-    wordCounts = pairs.reduceByKey(lambda x, y: x + y).takeOrdered(10, lambda args:-args[1])
-    print(wordCounts)
+    # 상위 10개만 가져오기 + 등장빈도 2번 이상
+    #wordCounts = pairs.reduceByKey(lambda x, y: x + y).takeOrdered(10, lambda args:-args[1])
+    wordCounts = pairs.reduceByKey(lambda x, y: x + y).filter(lambda args : args[1] > 2)
+    #print(wordCounts)
+    ordered = wordCounts.takeOrdered(10, lambda args:-args[1])
+    print(ordered)
 
 
 if __name__ == "__main__":
     spark.conf.set("spark.debug.maxToStringFields", 10000)
     spark.conf.set('spark.sql.debug.maxToStringFields', 2000)
-    ssc = StreamingContext(spark.sparkContext, 10)
+    ssc = StreamingContext(spark.sparkContext, 20)
     #lines = ssc.socketTextStream(IP, Port)
     #ssc.checkpoint("checkpoint")
     lines = ssc.socketTextStream(IP, Port, storageLevel=StorageLevel(True, True, False, False, 1))
