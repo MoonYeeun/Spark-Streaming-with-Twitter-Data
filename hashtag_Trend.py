@@ -1,9 +1,8 @@
-from pyspark.streaming import StreamingContext
 import pyspark
 spark = pyspark.sql.SparkSession.builder.appName("pysaprk_python").getOrCreate()
+from pyspark.streaming import StreamingContext
 from pyspark import StorageLevel
 from itertools import chain
-from konlpy.tag import Okt
 
 # sc = SparkContext('local[2]',"test")
 # sqlContext = SQLContext(sc)
@@ -17,10 +16,7 @@ schema = [
     'is_quote_status',
     'entities.hashtags.text as hashtag'
 ]
-quote_exist_schema = [
-    'text',
-    'quoted_status.text as quoted_text'
-]
+
 # 분석 대상에서 제외할 단어 명시
 mystopwords = [
     'RT',
@@ -66,9 +62,8 @@ def process(rdd):
         #tag.show()
         hashtag = tag.select('hashtag').rdd.flatMap(lambda x : x)
         print(hashtag.collect())
-        # 현재 타임에 들어온 tweet text 중 의미있는 어절만 추출
+        # 현재 타임에 들어온 hashtag 전처리
         result = hashtag_processing(hashtag.collect())
-        #print(result)
 
         #word count 작업을 위해 결과 rdd로 만들어줌
         rdd = spark.sparkContext.parallelize(result)
