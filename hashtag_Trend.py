@@ -1,13 +1,27 @@
 import pyspark
-spark = pyspark.sql.SparkSession.builder.appName("pysaprk_python").getOrCreate()
+sc = pyspark.SparkConf()\
+    .setMaster("local[*]")\
+    .set("spark.driver.memory","8g")\
+    .set("spark.executor.memory","8g")\
+    .set("spark.jars","/Users/yeeun/Apache/spark-2.4.4-bin-hadoop2.7/jars/spark-redis-2.4.0-jar-with-dependencies.jar")
+
+sparkContext = pyspark.SparkContext(conf=sc)
+
+spark = pyspark.sql.SparkSession(sparkContext).builder\
+    .appName("pysaprk_python")\
+    .config("spark.redis.host", "localhost")\
+    .config("spark.redis.port", "6379")\
+    .getOrCreate()
 from pyspark.streaming import StreamingContext
 from pyspark import StorageLevel
+from pyspark.sql.functions import current_date,current_timestamp
+from pyspark.sql.types import *
 from itertools import chain
+import redis, json, time
+myRedis = redis.Redis(host='127.0.0.1', port=6379, db=0)
 
-# sc = SparkContext('local[2]',"test")
-# sqlContext = SQLContext(sc)
 IP = "127.0.0.1"
-Port = 5556
+Port = 5559
 
 # tweet hashtag Trend analysis
 
@@ -33,7 +47,9 @@ option_schema = [
     # quoted tweet 존재 할 경우
     'quoted_status.text as quoted_text'
 ]
-
+# trend rank 결과 저장할 df schema
+rank_schema = StructType([StructField("Words", StringType())\
+                      ,StructField("total", IntegerType())])
 # get DStream RDD
 def getStreaming(data, schema=None):
     data.pprint() # 실시간으로 들어오는 tweet 출력
@@ -80,14 +96,21 @@ def word_count(list):
     #wordCounts = pairs.reduceByKey(lambda x, y: x + y).takeOrdered(10, lambda args:-args[1])
     wordCounts = pairs.reduceByKey(lambda x, y: x + y).filter(lambda args : args[1] > 2)
     #print(wordCounts)
-    ordered = wordCounts.takeOrdered(10, lambda args:-args[1])
-    print(ordered)
-
+    ranking = wordCounts.takeOrdered(10, lambda args:-args[1])
+    print(ranking)
+    # key : 현재 시간 , value : 순위 결과 json 으로 redis 저장
+    current_time = time.strftime("%d/%m/%Y")
+    rank_to_json = json.dumps(ranking)
+    myRedis.set(current_time, rank_to_json, ex=60*5)
+    # df = spark.createDataFrame(ordered, schema=rank_schema)
+    # df.show()
+    # df.write.format("org.apache.spark.sql.redis").option("table", "trend_rank") \
+    #     .save()
 
 if __name__ == "__main__":
     spark.conf.set("spark.debug.maxToStringFields", 10000)
     spark.conf.set('spark.sql.debug.maxToStringFields', 2000)
-    ssc = StreamingContext(spark.sparkContext, 20)
+    ssc = StreamingContext(sparkContext, 20)
     #lines = ssc.socketTextStream(IP, Port)
     #ssc.checkpoint("checkpoint")
     lines = ssc.socketTextStream(IP, Port, storageLevel=StorageLevel(True, True, False, False, 1))
