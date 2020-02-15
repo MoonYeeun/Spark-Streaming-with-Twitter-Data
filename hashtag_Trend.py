@@ -17,7 +17,6 @@ spark = pyspark.sql.SparkSession(sparkContext).builder\
 
 from pyspark.streaming import StreamingContext
 from pyspark import StorageLevel
-from pyspark.sql.functions import current_date,current_timestamp
 from itertools import chain
 import redis, json, time
 myRedis = redis.Redis(host='127.0.0.1', port=6379, db=0)
@@ -41,7 +40,15 @@ mystopwords = [
     'Bts',
     '방탄소년단'
 ]
-
+similarwords = [
+    ['정국', 'JUNGKOOK'],
+    ['지민', 'JIMIN'],
+    ['제이홉', 'JHOPE'],
+    ['슈가', 'SUGA'],
+    ['태형', '김태형', 'V', 'TAEHYUNG', '뷔'],
+    ['남준', '김남준', '랩몬', 'RM'],
+    ['석진', '진', '김석진', 'JIN']
+]
 option_schema = [
     # extend tweet 존재 할 경우
     'extended_tweet.full_text as extended_text',
@@ -64,6 +71,32 @@ def hashtag_processing(text):
     for i in total:
         if i not in mystopwords:
             result.append(i)
+    # 유사어 제거
+    words = '-'.join(result)
+    words = words.upper()
+
+    for i in similarwords[0]:
+        if i in words:
+            words = words.replace(i, 'Jungkook')
+    for i in similarwords[1]:
+        if i in words:
+            words = words.replace(i, 'Jimin')
+    for i in similarwords[2]:
+        if i in words:
+            words = words.replace(i, 'JHope')
+    for i in similarwords[3]:
+        if i in words:
+            words = words.replace(i, 'Suga')
+    for i in similarwords[4]:
+        if i in words:
+            words = words.replace(i, 'Taehyung')
+    for i in similarwords[5]:
+        if i in words:
+            words = words.replace(i, 'RM')
+    for i in similarwords[6]:
+        if i in words:
+            words = words.replace(i, 'JIN')
+    result = words.split('-')
 
     print('응 들어옴')
     print(result)
@@ -75,7 +108,6 @@ def process(rdd):
         rawTweet = spark.read.json(rdd)
         rawTweet.registerTempTable("tweets") #creates an in-memory table that is scoped to the cluster in which it was created.
         tag = rawTweet.selectExpr(schema)
-        #tag.show()
         hashtag = tag.select('hashtag').rdd.flatMap(lambda x : x)
         print(hashtag.collect())
         # 현재 타임에 들어온 hashtag 전처리
