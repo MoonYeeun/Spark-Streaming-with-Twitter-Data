@@ -41,13 +41,13 @@ mystopwords = [
     '방탄소년단'
 ]
 similarwords = [
-    ['정국', 'JUNGKOOK'],
-    ['지민', 'JIMIN'],
-    ['제이홉', 'JHOPE'],
-    ['슈가', 'SUGA'],
-    ['태형', '김태형', 'V', 'TAEHYUNG', '뷔'],
-    ['남준', '김남준', '랩몬', 'RM'],
-    ['석진', '진', '김석진', 'JIN']
+    ['전정국', '정국'],
+    ['박지민', '지민'],
+    ['제이홉'],
+    ['슈가'],
+    ['김태형', '태형', '뷔', 'TAEHYUNG'],
+    ['김남준', '남준', '랩몬'],
+    ['김석진', '석진', '진', 'SEOKJIN', 'JIN']
 ]
 option_schema = [
     # extend tweet 존재 할 경우
@@ -65,38 +65,45 @@ def getStreaming(data, schema=None):
 
 # hashtag 전처리
 def hashtag_processing(text):
-    total = list(chain.from_iterable(text)) # 리스트 안에 리스트 하나의 리스트로 합치기
+    del_similar = []
     result = []
+    # 각 tweet 별 유사어 제거
+    for v in text:
+        if not v:
+            continue
+        words = '-'.join(v)
+        words = words.upper()
+        temp = []
+        for i in similarwords[0]:
+            if i in words:
+                words = words.replace(i, 'JUNGKOOK')
+        for i in similarwords[1]:
+            if i in words:
+                words = words.replace(i, 'JIMIN')
+        for i in similarwords[2]:
+            if i in words:
+                words = words.replace(i, 'JHOPE')
+        for i in similarwords[3]:
+            if i in words:
+                words = words.replace(i, 'SUGA')
+        for i in similarwords[4]:
+            if i in words:
+                words = words.replace(i, 'V')
+        for i in similarwords[5]:
+            if i in words:
+                words = words.replace(i, 'RM')
+        for i in similarwords[6]:
+            if i in words:
+                words = words.replace(i, 'JIN')
+        temp = words.split('-')
+        temp = list(set(temp))
+        del_similar.append(temp)
+
+    total = list(chain.from_iterable(del_similar))  # 리스트 안에 리스트 하나의 리스트로 합치기
     # 불용어 제거
     for i in total:
         if i not in mystopwords:
             result.append(i)
-    # 유사어 제거
-    words = '-'.join(result)
-    words = words.upper()
-
-    for i in similarwords[0]:
-        if i in words:
-            words = words.replace(i, 'Jungkook')
-    for i in similarwords[1]:
-        if i in words:
-            words = words.replace(i, 'Jimin')
-    for i in similarwords[2]:
-        if i in words:
-            words = words.replace(i, 'JHope')
-    for i in similarwords[3]:
-        if i in words:
-            words = words.replace(i, 'Suga')
-    for i in similarwords[4]:
-        if i in words:
-            words = words.replace(i, 'Taehyung')
-    for i in similarwords[5]:
-        if i in words:
-            words = words.replace(i, 'RM')
-    for i in similarwords[6]:
-        if i in words:
-            words = words.replace(i, 'JIN')
-    result = words.split('-')
 
     print('응 들어옴')
     print(result)
@@ -128,12 +135,12 @@ def word_count(list):
     #wordCounts = pairs.reduceByKey(lambda x, y: x + y).takeOrdered(10, lambda args:-args[1])
     wordCounts = pairs.reduceByKey(lambda x, y: x + y).filter(lambda args : args[1] > 2)
     #print(wordCounts)
-    ranking = wordCounts.takeOrdered(10, lambda args:-args[1])
+    ranking = wordCounts.takeOrdered(20, lambda args:-args[1])
     print(ranking)
     # key : 현재 시간 , value : 순위 결과 json 으로 redis 저장
-    current_time = time.strftime("%d/%m/%Y")
+    current_time = time.strftime("%S/%M/%H/%d/%m/%Y")
     rank_to_json = json.dumps(ranking)
-    myRedis.set(current_time, rank_to_json, ex=60*5)
+    myRedis.set(current_time, rank_to_json, ex=60*60) # 1시간 expire 저장
 
 
 if __name__ == "__main__":
