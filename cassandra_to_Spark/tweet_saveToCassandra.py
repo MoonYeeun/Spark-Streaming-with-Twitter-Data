@@ -2,7 +2,6 @@ import pyspark
 from pyspark.streaming import StreamingContext
 from itertools import chain
 from pyspark.sql.functions import *
-from pyspark import StorageLevel
 from pyspark.sql.types import *
 import json, time
 
