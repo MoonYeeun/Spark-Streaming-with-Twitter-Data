@@ -17,6 +17,7 @@ schema = [
     'retweeted_status as tweet_content',
     'timestamp'
 ]
+
 struct = StructType([StructField("tweet_id", LongType(), False),
                      StructField("tweet_content", StringType(), False),
                      StructField("tweet_favorite_count", LongType(), False),
@@ -25,7 +26,7 @@ struct = StructType([StructField("tweet_id", LongType(), False),
                      StructField("timestamp", LongType(), False)])
 
 
-def process_Tweet(data):
+def process_tweet(data):
     # df 생성에 필요한 데이터 추출 (리트윗 된 트윗 id, 트위 내용, 트윗 좋아요 개수, 트윗 인용 개수, 리트윗 개수, 작성시간)
     tweet_content = data.select('tweet_content').rdd.flatMap(lambda value: value).collect()
     tweet_id = data.select('tweet_content').rdd.map(lambda value: json.loads(value[0])) \
@@ -43,10 +44,10 @@ def process_Tweet(data):
         zip(tweet_id, tweet_content, tweet_favorite_count, tweet_quoted_count, tweet_retweet_count, timestamp), struct)
     newDF.show()
 
-def save_Tweet(df):
+
+def save_tweet(df):
     df.write.format("org.apache.spark.sql.cassandra")\
     .mode('append').options(table="tweet_rank", keyspace="bts").save()
-
 
 
 if __name__ == "__main__":
@@ -67,13 +68,13 @@ if __name__ == "__main__":
             .format("org.apache.spark.sql.cassandra") \
             .options(table="master_dataset", keyspace="bts") \
             .load()
-        lines.printSchema()
-        current_time = int(time.time() * 1000000)  # 현재시간 마이크로 세컨즈 까지
+        # 현재시간 마이크로 세컨즈 까지
+        current_time = int(time.time() * 1000000)
         print(current_time)  # 현재시간 출력
         # 현재 시간 부터 10초 전까지 data 불러오기
         lines = lines.selectExpr(schema) \
             .where((lines.timestamp >= current_time - 10000000) & (lines.timestamp <= current_time) & (
                     lines.retweeted == True)).limit(10).cache()
         # lines.show()
-        process_Tweet(lines)
+        process_tweet(lines)
         time.sleep(10)
