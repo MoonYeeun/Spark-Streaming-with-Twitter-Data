@@ -1,12 +1,9 @@
 import pyspark
 from pyspark.streaming import StreamingContext
-from pyspark import StorageLevel
 from pyspark.sql.types import *
-import json, time
+import json, time,redis
 from itertools import chain
-
-# 해시태그 분석
-
+myRedis = redis.Redis(host='10.240.14.39', port=6379, password= '12341234', db=1)
 # import pyspark_cassandra
 # sc = pyspark.SparkConf()\
 #     .setMaster("local[*]")\
@@ -23,7 +20,6 @@ spark = pyspark.sql.SparkSession.builder \
     .config('spark.cassandra.connection.host', '10.240.14.37') \
     .config('spark.cassandra.connection.port', '9042') \
     .getOrCreate()
-# myRedis = redis.Redis(host='127.0.0.1', port=6379, db=0)
 
 # cassandra 에서 받아오는 data schema
 schema = StructType([
@@ -38,7 +34,7 @@ schema = StructType([
     StructField("user", StringType(), False),
     StructField("retweeted_status", StringType(), True),
     StructField("quoted_status", StringType(), True),
-    StructField("hashtags", ArrayType(), False),
+#     StructField("hashtags", ArrayType(), False),
     StructField("entities", StringType(), False),
     StructField("extended_entities", StringType(), True),
     StructField("extended_tweet", StringType(), True),
@@ -54,6 +50,7 @@ mystopwords = [
     'Bts',
     '방탄소년단'
 ]
+
 # 유사어 설정
 similarwords = [
     ['정국', 'JUNGKOOK'],
@@ -65,13 +62,14 @@ similarwords = [
     ['김석진', '석진', '진', 'SEOKJIN', 'JIN']
 ]
 
+SECONDS = 20000000
 
 # get DStream dataframe
 def get_streaming(data, schema=None):
-    process_df(data)
-    return True
+    result = process_df(data)
+    return result
 
-
+# 카산드라로 부터 받아온 데이터프레임 가공
 def process_df(data):
     rdd = data.rdd.map(lambda value: json.loads(value[0])) \
         .map(lambda v: v['hashtags']).collect()
@@ -85,7 +83,8 @@ def process_df(data):
     processing_result = process_hashtag(result)
     # word count 작업을 위해 결과(list) rdd로 만들어줌
     rdd = spark.sparkContext.parallelize(processing_result, 2)
-    word_count(rdd)
+    count_result = word_count(rdd)
+    return count_result
 
 
 # 해시태그 전처리
@@ -143,11 +142,14 @@ def word_count(list):
     wordCounts = pairs.reduceByKey(lambda x, y: x + y).filter(lambda args: args[1] > 2)
     ranking = wordCounts.takeOrdered(20, lambda args: -args[1])
     print(ranking)
-    # key : 현재 시간 , value : 순위 결과 json 으로 redis 저장
-#     current_time = time.strftime("%d/%m/%Y")
-#     rank_to_json = json.dumps(ranking)
-#     myRedis.set(current_time, rank_to_json, ex=60*5)
+    return ranking
 
+# 해시태그 순위 저장
+def save_hashtag(data,time):
+    # key : 현재 시간 , value : 순위 결과 json 으로 redis 저장
+    rank_to_json = json.dumps(data)
+    myRedis.set(current_time, rank_to_json, ex=60*60)
+    print('저장완료')
 
 if __name__ == "__main__":
     while True:
@@ -160,9 +162,8 @@ if __name__ == "__main__":
         print(current_time)  # 현재시간 출력
         # 현재 시간 부터 20초 전까지 data 불러오기
         lines = lines.select('entities') \
-            .where((lines.timestamp >= current_time - 20000000) & (lines.timestamp <= current_time)).cache()
-        get_streaming(lines)
+            .where((lines.timestamp >= current_time - SECONDS) & (lines.timestamp <= current_time)).cache()
+        result = get_streaming(lines)
+        save_hashtag(result, current_time)
         time.sleep(20)
-
-
 
