@@ -1,19 +1,9 @@
 import pyspark
-from pyspark.streaming import StreamingContext
 from pyspark.sql.types import *
-import json, time,redis
+import json, time, datetime, redis
 from itertools import chain
-myRedis = redis.Redis(host='10.240.14.39', port=6379, password= '12341234', db=1)
-# import pyspark_cassandra
-# sc = pyspark.SparkConf()\
-#     .setMaster("local[*]")\
-#     .set("spark.driver.memory","8g")\
-#     .set("spark.executor.memory","8g")\
-#     .set("spark.debug.maxToStringFields", 10000) \
-#     .setMaster("spark://spark-master:7077") \
-#     .set("spark.cassandra.connection.host", "cas-1")
-# sparkContext = pyspark.SparkContext(conf=sc)
-# sc = CassandraSparkContext(conf=conf)
+
+myRedis = redis.Redis(host='10.240.14.39', port=6379, password='12341234', db=1)
 
 spark = pyspark.sql.SparkSession.builder \
     .appName("pysaprk_python") \
@@ -34,7 +24,7 @@ schema = StructType([
     StructField("user", StringType(), False),
     StructField("retweeted_status", StringType(), True),
     StructField("quoted_status", StringType(), True),
-#     StructField("hashtags", ArrayType(), False),
+    #     StructField("hashtags", ArrayType(), False),
     StructField("entities", StringType(), False),
     StructField("extended_entities", StringType(), True),
     StructField("extended_tweet", StringType(), True),
@@ -64,10 +54,12 @@ similarwords = [
 
 SECONDS = 20000000
 
+
 # get DStream dataframe
 def get_streaming(data, schema=None):
     result = process_df(data)
     return result
+
 
 # 카산드라로 부터 받아온 데이터프레임 가공
 def process_df(data):
@@ -144,26 +136,32 @@ def word_count(list):
     print(ranking)
     return ranking
 
-# 해시태그 순위 저장
-def save_hashtag(data,time):
+    # 해시태그 순위 저장
+
+
+def save_hashtag(data, time):
     # key : 현재 시간 , value : 순위 결과 json 으로 redis 저장
     rank_to_json = json.dumps(data)
-    myRedis.set(current_time, rank_to_json, ex=60*60)
+    myRedis.set(time, rank_to_json, ex=60 * 60)
     print('저장완료')
+
 
 if __name__ == "__main__":
     while True:
-        # 카산드라로부터 data 불러오기  (20초마다)
+        # 현재시간 마이크로 세컨즈 까지
+        current_time = int(time.time() * 1000000)  # 현재시간 마이크로 세컨즈 까지
+        # redis 저장 포맷 시간 형식 ( 년/월/일/시/분) 으로
+        current_time_format = datetime.datetime.fromtimestamp(int(current_time / 1000000)).strftime('%Y/%m/%d/%H/%M')
+        # 카산드라로부터 data 불러오기 (30초 마다)
         lines = spark.read \
             .format("org.apache.spark.sql.cassandra") \
             .options(table="master_dataset", keyspace="bts") \
-            .load()
-        current_time = int(time.time() * 1000000)  # 현재시간 마이크로 세컨즈 까지
+            .load().select('entities').where(col('timestamp') >= current_time - SECONDS) \
+            .where(col('timestamp') <= current_time).limit(100).cache()
+        print(current_time_format)
         print(current_time)  # 현재시간 출력
-        # 현재 시간 부터 20초 전까지 data 불러오기
-        lines = lines.select('entities') \
-            .where((lines.timestamp >= current_time - SECONDS) & (lines.timestamp <= current_time)).cache()
+
         result = get_streaming(lines)
-        save_hashtag(result, current_time)
+        save_hashtag(result, current_time_format)
         time.sleep(20)
 
