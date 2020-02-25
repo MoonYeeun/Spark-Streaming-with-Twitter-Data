@@ -1,5 +1,6 @@
 import pyspark
 from pyspark.sql.types import *
+from pyspark.sql.functions import *
 import json, time, datetime, redis
 from itertools import chain
 
@@ -57,8 +58,11 @@ SECONDS = 20000000
 
 # get DStream dataframe
 def get_streaming(data, schema=None):
-    result = process_df(data)
-    return result
+    if bool(data.take(1)):
+        result = process_df(data)
+        return result
+    else:
+        return False
 
 
 # 카산드라로 부터 받아온 데이터프레임 가공
@@ -162,6 +166,10 @@ if __name__ == "__main__":
         print(current_time)  # 현재시간 출력
 
         result = get_streaming(lines)
-        save_hashtag(result, current_time_format)
-        time.sleep(20)
+        if result is not False:
+            # print(result)
+            save_hashtag(result, current_time_format)
+        else:
+            print('there is no data')
+        time.sleep(10)
 
