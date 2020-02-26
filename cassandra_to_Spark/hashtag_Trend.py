@@ -1,8 +1,9 @@
 import pyspark
 from pyspark.sql.types import *
 from pyspark.sql.functions import *
-import json, time, datetime, redis
+import json, time, redis
 from itertools import chain
+from datetime import datetime
 
 myRedis = redis.Redis(host='10.240.14.39', port=6379, password='12341234', db=1)
 
@@ -47,35 +48,41 @@ similarwords = [
     ['정국', 'JUNGKOOK'],
     ['지민', 'JIMIN'],
     ['제이홉', 'JHOPE'],
-    ['슈가', 'SUGA'],
-    ['김태형', '태형', '뷔', 'TAEHYUNG'],
-    ['김남준', '남준', '랩몬', 'RM'],
-    ['김석진', '석진', '진', 'SEOKJIN', 'JIN']
+    ['슈가', '윤기'],
+    ['김태형', '태형', '뷔', 'KIMTAEHYUNG', 'TAEHYUNG'],
+    ['김남준', '남준', '랩몬', 'KIMNAMJOON', 'NAMJOON'],
+    ['김석진', '석진', '진', 'KIMSEOKJIN', 'SEOKJIN']
 ]
 
-SECONDS = 20000000
+SECONDS = 30000000
 
 
 # get DStream dataframe
-def get_streaming(data, schema=None):
-    if bool(data.take(1)):
-        result = process_df(data)
+def get_streaming(tweet, retweet, schema=None):
+    if bool(tweet.take(1)) or bool(retweet.take(1)):
+        result = process_df(tweet, retweet)
         return result
     else:
         return False
 
 
 # 카산드라로 부터 받아온 데이터프레임 가공
-def process_df(data):
-    rdd = data.rdd.map(lambda value: json.loads(value[0])) \
+def process_df(tweet, retweet):
+    tweet_rdd = tweet.rdd.map(lambda value: json.loads(value[0])) \
         .map(lambda v: v['hashtags']).collect()
+    retweet_rdd = retweet.select('retweeted_status').rdd.map(lambda value: json.loads(value[0])) \
+        .map(lambda v: v['entities']).map(lambda v: v['hashtags']).collect()
     result = []
-    for i in rdd:
+    for i in tweet_rdd:
         temp = []
         for j in i:
             temp.append(j['text'])
         result.append(temp)
-    # print(result)
+    for i in retweet_rdd:
+        temp = []
+        for j in i:
+            temp.append(j['text'])
+        result.append(temp)
     processing_result = process_hashtag(result)
     # word count 작업을 위해 결과(list) rdd로 만들어줌
     rdd = spark.sparkContext.parallelize(processing_result, 2)
@@ -105,10 +112,10 @@ def process_hashtag(text):
                 words = words.replace(i, 'JHope')
         for i in similarwords[3]:
             if i in words:
-                words = words.replace(i, 'Suga')
+                words = words.replace(i, 'SUGA')
         for i in similarwords[4]:
             if i in words:
-                words = words.replace(i, 'Taehyung')
+                words = words.replace(i, 'V')
         for i in similarwords[5]:
             if i in words:
                 words = words.replace(i, 'RM')
@@ -134,19 +141,20 @@ def process_hashtag(text):
 def word_count(list):
     print('word count 들어옴')
     pairs = list.map(lambda word: (word, 1))
-    # 상위 10개만 가져오기 + 등장빈도 2번 이상
+    # 상위 15개만 가져오기 + 등장빈도 2번 이상
     wordCounts = pairs.reduceByKey(lambda x, y: x + y).filter(lambda args: args[1] > 2)
-    ranking = wordCounts.takeOrdered(20, lambda args: -args[1])
+    ranking = wordCounts.takeOrdered(15, lambda args: -args[1])
     print(ranking)
+    if not ranking:  # 순위 없는 경우
+        return False
     return ranking
 
-    # 해시태그 순위 저장
 
-
+# 해시태그 순위 저장
 def save_hashtag(data, time):
-    # key : 현재 시간 , value : 순위 결과 json 으로 redis 저장
+    # key : 'hashtag' , value : 순위 결과 json 으로 redis 저장
     rank_to_json = json.dumps(data)
-    myRedis.set(time, rank_to_json, ex=60 * 60)
+    myRedis.set('hashtag', rank_to_json, ex=60 * 60 * 24 * 7)
     print('저장완료')
 
 
@@ -155,21 +163,35 @@ if __name__ == "__main__":
         # 현재시간 마이크로 세컨즈 까지
         current_time = int(time.time() * 1000000)  # 현재시간 마이크로 세컨즈 까지
         # redis 저장 포맷 시간 형식 ( 년/월/일/시/분) 으로
-        current_time_format = datetime.datetime.fromtimestamp(int(current_time / 1000000)).strftime('%Y/%m/%d/%H/%M')
+        current_time_format = datetime.fromtimestamp(int(current_time / 1000000)).strftime('%Y/%m/%d/%H/%M')
+        date = datetime.now().date().__str__()
+        hour = datetime.now().hour
         # 카산드라로부터 data 불러오기 (30초 마다)
-        lines = spark.read \
+        # 트윗 데이터
+        tweet = spark.read \
             .format("org.apache.spark.sql.cassandra") \
-            .options(table="master_dataset", keyspace="bts") \
-            .load().select('entities').where(col('timestamp') >= current_time - SECONDS) \
-            .where(col('timestamp') <= current_time).limit(100).cache()
+            .options(table="tweet_dataset", keyspace="bts") \
+            .load().select('entities') \
+            .where(col('date') == date) \
+            .where(col('hour') == hour) \
+            .where(col('timestamp') >= current_time - SECONDS) \
+            .where(col('timestamp') <= current_time).cache()
+        # 리트윗 데이터
+        retweet = spark.read \
+            .format("org.apache.spark.sql.cassandra") \
+            .options(table="retweet_dataset", keyspace="bts") \
+            .load().select("*") \
+            .where(col('date') == date) \
+            .where(col('hour') == hour) \
+            .where(col('timestamp') >= current_time - SECONDS) \
+            .where(col('timestamp') <= current_time).cache()
         print(current_time_format)
         print(current_time)  # 현재시간 출력
-
-        result = get_streaming(lines)
+        result = get_streaming(tweet, retweet)
         if result is not False:
-            # print(result)
             save_hashtag(result, current_time_format)
         else:
             print('there is no data')
-        time.sleep(10)
+        time.sleep(20)
+
 
