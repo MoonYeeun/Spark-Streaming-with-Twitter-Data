@@ -1,10 +1,12 @@
 import pyspark
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
-import json, time, datetime, redis
+import json, time, redis
 import pyspark.sql.functions as f
+from datetime import datetime
 
-myRedis = redis.Redis(host='10.240.14.39', port=6379, password='12341234', db=0)
+myRedis_current = redis.Redis(host='10.240.14.39', port=6379, password='12341234', db=2)
+myRedis_past = redis.Redis(host='10.240.14.39', port=6379, password='12341234', db=0)
 
 spark = pyspark.sql.SparkSession.builder \
     .appName("pysaprk_python") \
@@ -13,7 +15,6 @@ spark = pyspark.sql.SparkSession.builder \
     .getOrCreate()
 
 schema = [
-    'retweeted',
     'retweeted_status',
     'timestamp'
 ]
@@ -25,7 +26,7 @@ struct = StructType([StructField("tweet_id", LongType(), False),
                      StructField("retweeted_count", LongType(), False),
                      StructField("timestamp", LongType(), False)])
 
-SECONDS = 60000000
+SECONDS = 30000000
 
 
 def process_tweet(data):
@@ -68,8 +69,6 @@ def rank_tweet(df):
         rank.show()
         # 상위 랭킹 10개의 tweet 내용 리스트로 변환
         tweet_list = rank.select('tweet_content').rdd.flatMap(lambda x: x).take(10)
-        #         for i in tweet_list:
-        #             print(i)
         return tweet_list
     else:
         print('데이터프레임 비어있음')
@@ -82,7 +81,8 @@ def save_tweet(data, time):
     #     .mode('append').options(table="tweet_rank", keyspace="bts").save()
     # key : 현재 시간 , value : 순위 결과 json 으로 redis 저장
     rank_to_json = json.dumps(data)
-    myRedis.set(time, rank_to_json, ex=60 * 60 * 24 * 7)  # 일주일 expire
+    myRedis_current.set('tweetRank', rank_to_json, ex=60 * 60 * 24 * 7)  # 일주일 expire
+    myRedis_past.set(time, rank_to_json, ex=60 * 60 * 24 * 7)
     print('저장완료')
 
 
@@ -91,14 +91,19 @@ if __name__ == "__main__":
         # 현재시간 마이크로 세컨즈 까지
         current_time = int(time.time() * 1000000)  # 현재시간 마이크로 세컨즈 까지
         # redis 저장 포맷 시간 형식 ( 년/월/일/시/분) 으로
-        current_time_format = datetime.datetime.fromtimestamp(int(current_time / 1000000)).strftime('%Y/%m/%d/%H/%M')
+        current_time_format = datetime.fromtimestamp(int(current_time / 1000000)).strftime('%Y/%m/%d/%H/%M')
+        date = datetime.now().date().__str__()
+        hour = datetime.now().hour
+
         # 카산드라로부터 data 불러오기 (30초 마다)
         lines = spark.read \
             .format("org.apache.spark.sql.cassandra") \
-            .options(table="master_dataset", keyspace="bts") \
-            .load().select(schema).where(col('timestamp') >= current_time - SECONDS) \
-            .where(col('timestamp') <= current_time) \
-            .where(col('retweeted') == True).limit(100).cache()
+            .options(table="retweet_dataset", keyspace="bts") \
+            .load().select(schema) \
+            .where(col('date') == date) \
+            .where(col('hour') == hour) \
+            .where(col('timestamp') >= current_time - SECONDS) \
+            .where(col('timestamp') <= current_time).cache()
         print(current_time_format)
         print(current_time)  # 현재시간 출력
 
@@ -108,7 +113,7 @@ if __name__ == "__main__":
             save_tweet(result, current_time_format)
         else:
             print('there is no data')
-        time.sleep(10)
+        time.sleep(20)
 
 
 
