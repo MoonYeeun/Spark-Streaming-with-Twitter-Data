@@ -1,4 +1,4 @@
-## Spark Streaming 을 통한 tweet 전처리 및 분석 
+## Spark 를 통한 tweet 전처리 및 분석 
 
 - data flow process
 
